@@ -24,7 +24,7 @@ A simple Python tool to convert HEIC images to JPG format using the Pillow libra
 
 1. **Clone the repository:**
    ```bash
-   git clone git@github.com:hunterbrewer04/your-repo.git
+   git clone git@github.com:hunterbrewer04/Heic-JPG_Converter
    ```
 
 2. **Navigate to the project directory:**
