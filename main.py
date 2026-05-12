@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -48,9 +50,12 @@ def convert_one(
         return Status.ERROR, f"{image_file.name}: {e}"
 
     if archive:
-        archive_dir = image_file.parent / "heic_originals"
-        archive_dir.mkdir(exist_ok=True)
-        shutil.move(image_file, archive_dir / image_file.name)
+        try:
+            archive_dir = image_file.parent / "heic_originals"
+            archive_dir.mkdir(exist_ok=True)
+            shutil.move(image_file, archive_dir / image_file.name)
+        except Exception as e:
+            return Status.ERROR, f"{new_name.name} saved but archive failed: {e}"
 
     return Status.CONVERTED, new_name.name
 
@@ -69,7 +74,10 @@ def collect_files(paths: list[Path]) -> list[Path]:
     files: list[Path] = []
     for p in paths:
         if p.is_file():
-            files.append(p)
+            if p.suffix.lower() == ".heic":
+                files.append(p)
+            else:
+                print(f"Warning: {p} is not a HEIC file, skipping")
         elif p.is_dir():
             files.extend(p.rglob("*.[hH][eE][iI][Cc]"))
         else:
@@ -77,10 +85,33 @@ def collect_files(paths: list[Path]) -> list[Path]:
     return files
 
 
+def dedupe_by_output(files: list[Path], output_dir: Path) -> list[Path]:
+    seen: dict[Path, Path] = {}
+    deduped: list[Path] = []
+    for f in files:
+        target = output_dir / f.with_suffix(".jpg").name
+        if target in seen:
+            print(
+                f"Warning: {f} collides with {seen[target]} at {target.name}; "
+                "skipping the later one to avoid concurrent writes"
+            )
+            continue
+        seen[target] = f
+        deduped.append(f)
+    return deduped
+
+
 def quality_arg(value: str) -> int:
     iv = int(value)
     if not 1 <= iv <= 100:
         raise argparse.ArgumentTypeError("quality must be between 1 and 100")
+    return iv
+
+
+def jobs_arg(value: str) -> int:
+    iv = int(value)
+    if iv < 1:
+        raise argparse.ArgumentTypeError("jobs must be >= 1")
     return iv
 
 
@@ -107,7 +138,7 @@ def main() -> None:
         help="Overwrite existing .jpg files",
     )
     parser.add_argument(
-        "-j", "--jobs", type=int, default=os.cpu_count(),
+        "-j", "--jobs", type=jobs_arg, default=os.cpu_count() or 1,
         help="Parallel workers (default: all cores)",
     )
     args = parser.parse_args()
@@ -118,17 +149,23 @@ def main() -> None:
         notify("HEIC Converter", "No HEIC files found.")
         return
 
+    if args.output is not None:
+        files = dedupe_by_output(files, args.output)
+
     counts: Counter[Status] = Counter()
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        futures = [
+        future_to_path = {
             pool.submit(
                 convert_one, f, args.output,
                 args.quality, args.archive, args.force,
-            )
+            ): f
             for f in files
-        ]
-        for fut in tqdm(as_completed(futures), total=len(futures), desc="Converting"):
-            status, message = fut.result()
+        }
+        for fut in tqdm(as_completed(future_to_path), total=len(future_to_path), desc="Converting"):
+            try:
+                status, message = fut.result()
+            except Exception as e:
+                status, message = Status.ERROR, f"worker crashed on {future_to_path[fut].name}: {e}"
             counts[status] += 1
             tqdm.write(f"{status.value}: {message}")
 
