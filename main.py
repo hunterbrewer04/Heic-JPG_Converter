@@ -85,17 +85,20 @@ def collect_files(paths: list[Path]) -> list[Path]:
     return files
 
 
-def warn_output_collisions(files: list[Path], output_dir: Path) -> None:
+def dedupe_by_output(files: list[Path], output_dir: Path) -> list[Path]:
     seen: dict[Path, Path] = {}
+    deduped: list[Path] = []
     for f in files:
         target = output_dir / f.with_suffix(".jpg").name
         if target in seen:
             print(
-                f"Warning: {f} and {seen[target]} both target {target.name}; "
-                "only one will be kept"
+                f"Warning: {f} collides with {seen[target]} at {target.name}; "
+                "skipping the later one to avoid concurrent writes"
             )
-        else:
-            seen[target] = f
+            continue
+        seen[target] = f
+        deduped.append(f)
+    return deduped
 
 
 def quality_arg(value: str) -> int:
@@ -147,22 +150,22 @@ def main() -> None:
         return
 
     if args.output is not None:
-        warn_output_collisions(files, args.output)
+        files = dedupe_by_output(files, args.output)
 
     counts: Counter[Status] = Counter()
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        futures = [
+        future_to_path = {
             pool.submit(
                 convert_one, f, args.output,
                 args.quality, args.archive, args.force,
-            )
+            ): f
             for f in files
-        ]
-        for fut in tqdm(as_completed(futures), total=len(futures), desc="Converting"):
+        }
+        for fut in tqdm(as_completed(future_to_path), total=len(future_to_path), desc="Converting"):
             try:
                 status, message = fut.result()
             except Exception as e:
-                status, message = Status.ERROR, f"worker crashed: {e}"
+                status, message = Status.ERROR, f"worker crashed on {future_to_path[fut].name}: {e}"
             counts[status] += 1
             tqdm.write(f"{status.value}: {message}")
 
