@@ -2,6 +2,8 @@
 
 A Python tool to convert HEIC images to JPG format using the Pillow library and `pillow-heif` plugin. Point it at any file or folder from the CLI; metadata, quality, and parallelism are handled for you. Includes an optional macOS Finder Quick Action recipe so you can right-click photos and convert without opening a terminal.
 
+**Looking for a menu bar app instead of a CLI?** A native SwiftUI / `MenuBarExtra` rewrite lives in [`app/`](app/) — no Python runtime needed, uses macOS's built-in Image I/O for HEIC → JPEG. See [`app/README.md`](app/README.md) for build and install instructions.
+
 ---
 
 ## Features

@@ -1,0 +1,7 @@
+# XcodeGen-generated project
+HEICConverter.xcodeproj/
+# Xcode build artifacts
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
