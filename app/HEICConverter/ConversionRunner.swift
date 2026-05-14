@@ -15,11 +15,15 @@ final class ConversionRunner: ObservableObject {
         NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.panelIsKey = true }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.panelIsKey = true }
+        }
         NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil, queue: .main
-        ) { [weak self] _ in self?.panelIsKey = false }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.panelIsKey = false }
+        }
     }
 
     var hasInflight: Bool {
