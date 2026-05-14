@@ -21,6 +21,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: HEICConverter/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: "Loosey Goosey"
 
   HEICConverterTests:
     type: bundle.unit-test
