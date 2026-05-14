@@ -22,21 +22,15 @@ struct Defaults {
     }
 }
 
-/// Build a Converter from the values currently stored in UserDefaults.
-/// (Preserved from original Settings.swift.)
-func makeConverterFromSettings() -> Converter {
+/// Build a Converter using current UserDefaults, overriding the output directory.
+func makeConverterFromSettings(outputDirectory: URL) -> Converter {
     let d = UserDefaults.standard
     let q = d.object(forKey: SettingsKey.quality) as? Int ?? Defaults.quality
-    let outDir: URL? = {
-        let s = d.string(forKey: SettingsKey.outputDir) ?? ""
-        guard !s.isEmpty else { return nil }
-        return URL(fileURLWithPath: s)
-    }()
     return Converter(
         quality: Double(q) / 100.0,
         archiveOriginals: d.bool(forKey: SettingsKey.archive),
         force: d.bool(forKey: SettingsKey.force),
-        outputDirectory: outDir)
+        outputDirectory: outputDirectory)
 }
 
 enum OutputDirectoryResolver {

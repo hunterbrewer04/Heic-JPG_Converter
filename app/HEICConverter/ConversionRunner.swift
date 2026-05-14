@@ -81,7 +81,7 @@ final class ConversionRunner: ObservableObject {
         try? FileManager.default.createDirectory(
             at: outputDir, withIntermediateDirectories: true)
 
-        let converter = makeConverterForBatch(forcedOutputDir: outputDir)
+        let converter = makeConverterFromSettings(outputDirectory: outputDir)
 
         // Parallel, thermal-aware: spawn up to `effectiveLimit()` tasks at a time.
         await withTaskGroup(of: Void.self) { group in
@@ -227,20 +227,6 @@ final class ConversionRunner: ObservableObject {
         if failed > 0 { parts.append("failed \(failed)") }
         Notifier.notify(title: "Loosey Goosey", body: parts.joined(separator: ", "))
     }
-}
-
-// MARK: - Settings glue
-
-/// Build a Converter using current UserDefaults but overriding the output directory.
-/// Matches the existing Converter memberwise init in Converter.swift (quality is Double 0–1).
-func makeConverterForBatch(forcedOutputDir: URL) -> Converter {
-    let d = UserDefaults.standard
-    let q = d.object(forKey: SettingsKey.quality) as? Int ?? Defaults.quality
-    return Converter(
-        quality: Double(q) / 100.0,
-        archiveOriginals: d.bool(forKey: SettingsKey.archive),
-        force: d.bool(forKey: SettingsKey.force),
-        outputDirectory: forcedOutputDir)
 }
 
 // MARK: - Notifier (preserved from existing code)
