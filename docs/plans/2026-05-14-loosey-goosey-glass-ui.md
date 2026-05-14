@@ -10,6 +10,16 @@
 
 **Source spec:** `docs/specs/2026-05-14-loosey-goosey-glass-ui-design.md`
 
+## Build/test environment convention
+
+The user's machine has `xcode-select` pointed at Command Line Tools, not full Xcode. To avoid requiring `sudo xcode-select -s ...`, **every `xcodebuild` invocation in every task below must be prefixed with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`**. For example:
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild build -project HEICConverter.xcodeproj -scheme HEICConverter -destination 'platform=macOS' 2>&1 | tail -10
+```
+
+This is non-negotiable for any subagent running these commands. The `xcodebuild` lines below omit the prefix for readability; **prefix them yourself when executing.**
+
 ---
 
 ## File structure (locked in by this plan)
