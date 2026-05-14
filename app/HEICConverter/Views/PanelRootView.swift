@@ -32,9 +32,6 @@ struct PanelRootView: View {
                         endPoint: .bottomTrailing),
                     lineWidth: 1)
         )
-        // Track whether the panel is visible — gates the completion notification.
-        .onAppear    { runner.panelIsKey = true }
-        .onDisappear { runner.panelIsKey = false }
     }
 
     @ViewBuilder private var panelBackground: some View {

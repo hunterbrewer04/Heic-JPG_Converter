@@ -7,9 +7,20 @@ import UserNotifications
 @MainActor
 final class ConversionRunner: ObservableObject {
     @Published private(set) var queue: [QueueItem] = []
-    @Published var panelIsKey: Bool = false
+    private var panelIsKey: Bool = false
 
     private var processorTask: Task<Void, Never>?
+
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.panelIsKey = true }
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.panelIsKey = false }
+    }
 
     var hasInflight: Bool {
         queue.contains { item in
