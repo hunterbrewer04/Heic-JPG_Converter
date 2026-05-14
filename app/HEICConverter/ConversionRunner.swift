@@ -181,7 +181,7 @@ final class ConversionRunner: ObservableObject {
                 // Asymptotic curve — caps near 0.95
                 let p = min(0.95, 1.0 - exp(-elapsed / 0.4))
                 await self?.updateProgress(id: id, progress: p)
-                try? await Task.sleep(nanoseconds: 30_000_000)
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
     }
