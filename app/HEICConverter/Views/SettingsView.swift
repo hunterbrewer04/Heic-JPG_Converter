@@ -15,7 +15,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Output Folder").font(Theme.Typography.labelMd)
                 HStack {
-                    Text(URL(fileURLWithPath: outputDir).lastPathComponent)
+                    Text(OutputDirectoryResolver.resolve(configured: outputDir).lastPathComponent)
                         .font(Theme.Typography.bodyMd)
                         .lineLimit(1)
                         .truncationMode(.middle)
