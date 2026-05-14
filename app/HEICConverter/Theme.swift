@@ -18,14 +18,15 @@ enum Theme {
     }
 
     // MARK: - Typography (SF Pro — DESIGN.md sizes preserved)
-    enum Type {
-        static let headlineLg = Font.system(size: 24, weight: .semibold).tracking(-0.48)
-        static let headlineMd = Font.system(size: 18, weight: .semibold).tracking(-0.18)
-        static let bodyLg     = Font.system(size: 15, weight: .regular).tracking(-0.15)
+    // Note: tracking values are applied via .tracking() View modifier at the call site.
+    enum Typography {
+        static let headlineLg = Font.system(size: 24, weight: .semibold)
+        static let headlineMd = Font.system(size: 18, weight: .semibold)
+        static let bodyLg     = Font.system(size: 15, weight: .regular)
         static let bodyMd     = Font.system(size: 13, weight: .regular)
         static let bodyMdMed  = Font.system(size: 13, weight: .medium)
-        static let labelMd    = Font.system(size: 11, weight: .medium).tracking(0.22)
-        static let labelSm    = Font.system(size: 10, weight: .semibold).tracking(0.5)
+        static let labelMd    = Font.system(size: 11, weight: .medium)
+        static let labelSm    = Font.system(size: 10, weight: .semibold)
     }
 
     // MARK: - Geometry
