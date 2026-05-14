@@ -21,3 +21,28 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: HEICConverter/Info.plist
+
+  HEICConverterTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: HEICConverterTests
+    dependencies:
+      - target: HEICConverter
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/HEICConverter.app/Contents/MacOS/HEICConverter"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  HEICConverter:
+    build:
+      targets:
+        HEICConverter: all
+        HEICConverterTests: [test]
+    test:
+      targets:
+        - HEICConverterTests
