@@ -34,26 +34,33 @@ func makeConverterFromSettings(outputDirectory: URL) -> Converter {
 }
 
 enum OutputDirectoryResolver {
-    /// Returns the directory we should write to, following the fallback chain.
-    /// Configured path → ~/Downloads → temporary directory.
-    /// Updates UserDefaults if the configured path is invalid.
+    static func resolveFromDefaults() -> URL {
+        resolve(configured: UserDefaults.standard.string(forKey: SettingsKey.outputDir) ?? "")
+    }
+
+    /// Returns the directory we should write to, following the fallback chain:
+    /// configured path → ~/Downloads → temporary directory. Pure — no side effects,
+    /// safe to call from SwiftUI view bodies and concurrent contexts.
     static func resolve(configured: String) -> URL {
         let fm = FileManager.default
         if !configured.isEmpty {
             let url = URL(fileURLWithPath: configured)
-            if fm.fileExists(atPath: url.path), fm.isWritableFile(atPath: url.path) {
+            if isWritableDirectory(url, fm: fm) {
                 return url
             }
         }
 
         if let dl = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first,
-           fm.isWritableFile(atPath: dl.path) {
-            UserDefaults.standard.set(dl.path, forKey: SettingsKey.outputDir)
+           isWritableDirectory(dl, fm: fm) {
             return dl
         }
 
-        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        UserDefaults.standard.set(tmp.path, forKey: SettingsKey.outputDir)
-        return tmp
+        return URL(fileURLWithPath: NSTemporaryDirectory())
+    }
+
+    private static func isWritableDirectory(_ url: URL, fm: FileManager) -> Bool {
+        guard fm.isWritableFile(atPath: url.path) else { return false }
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+        return isDir
     }
 }

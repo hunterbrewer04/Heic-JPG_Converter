@@ -16,33 +16,30 @@ final class ConversionRunner: ObservableObject {
     }
 
     var hasInflight: Bool {
-        queue.contains { item in
-            switch item.status {
-            case .waiting, .converting: return true
-            case .completed, .failed:   return false
-            }
-        }
+        queue.contains { !$0.status.isTerminal }
     }
 
     // MARK: - Public API
 
     func enqueue(_ urls: [URL]) {
         let expanded = HEICScanner.collectHEICFiles(from: urls)
+        let outputDir = OutputDirectoryResolver.resolveFromDefaults()
+        let dedupedByTarget = HEICScanner.dedupeByOutput(expanded, outputDir: outputDir)
+
         var seen = Set(queue.map { $0.sourceURL })
         var newItems: [QueueItem] = []
-        for url in expanded.map({ $0.standardizedFileURL }) {
+        for url in dedupedByTarget.map({ $0.standardizedFileURL }) {
             if seen.insert(url).inserted {
                 newItems.append(QueueItem(sourceURL: url))
             }
         }
-
         guard !newItems.isEmpty else { return }
         queue.append(contentsOf: newItems)
         startProcessingIfIdle()
     }
 
     func clearCompleted() {
-        queue.removeAll { $0.status == .completed || $0.status == .failed }
+        queue.removeAll { $0.status.isTerminal }
     }
 
     func cancelAll() {
@@ -67,43 +64,35 @@ final class ConversionRunner: ObservableObject {
     }
 
     private nonisolated func processQueue() async {
-        let outputDir = await MainActor.run {
-            OutputDirectoryResolver.resolve(
-                configured: UserDefaults.standard.string(forKey: SettingsKey.outputDir) ?? "")
-        }
+        let outputDir = await MainActor.run { OutputDirectoryResolver.resolveFromDefaults() }
         try? FileManager.default.createDirectory(
             at: outputDir, withIntermediateDirectories: true)
 
         let converter = makeConverterFromSettings(outputDirectory: outputDir)
 
-        // Parallel, thermal-aware: spawn up to `effectiveLimit()` tasks at a time.
         await withTaskGroup(of: Void.self) { group in
             var inflight = 0
-
             while !Task.isCancelled {
                 let limit = effectiveConcurrencyLimit()
-
                 if inflight >= limit {
                     await group.next()
                     inflight -= 1
                     continue
                 }
-
-                guard let id = await self.pickNextWaitingID() else {
+                guard let claim = await self.pickAndClaimNext() else {
                     if inflight == 0 { break }
                     await group.next()
                     inflight -= 1
                     continue
                 }
-
                 group.addTask { [weak self] in
-                    await self?.runOne(id: id, using: converter)
+                    await self?.runOne(claim: claim, using: converter)
                 }
                 inflight += 1
             }
         }
 
-        await fireCompletionNotificationIfAppropriate()
+        await self.fireCompletionNotificationIfAppropriate()
     }
 
     private nonisolated func effectiveConcurrencyLimit() -> Int {
@@ -116,53 +105,45 @@ final class ConversionRunner: ObservableObject {
         }
     }
 
-    private func runOne(id: UUID, using converter: Converter) async {
-        await markConverting(id: id)
-        let animation = startProgressAnimation(for: id)
-        defer { animation.cancel() }
+    private struct ClaimedItem: Sendable {
+        let id: UUID
+        let sourceURL: URL
+    }
 
-        guard let source = await currentItem(id: id)?.sourceURL else { return }
-        let result = converter.convert(source)
-        await applyResult(id: id, result: result)
+    /// Picks the next waiting item and marks it .converting in a single MainActor
+    /// transaction. Two workers can't claim the same item because the status flip
+    /// happens before another `pickAndClaimNext` can run.
+    private func pickAndClaimNext() -> ClaimedItem? {
+        guard let idx = queue.firstIndex(where: { $0.status == .waiting }) else { return nil }
+        let claim = ClaimedItem(id: queue[idx].id, sourceURL: queue[idx].sourceURL)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            queue[idx].status = .converting(progress: 0)
+        }
+        return claim
+    }
+
+    nonisolated private func runOne(claim: ClaimedItem, using converter: Converter) async {
+        let animation = await self.startProgressAnimation(for: claim.id)
+        defer { animation.cancel() }
+        let result = converter.convert(claim.sourceURL)
+        await self.applyResult(id: claim.id, result: result)
     }
 
     // MARK: - Queue mutations (main actor)
 
-    private func pickNextWaitingID() async -> UUID? {
-        await MainActor.run {
-            queue.first(where: { $0.status == .waiting })?.id
-        }
-    }
-
-    private func currentItem(id: UUID) async -> QueueItem? {
-        await MainActor.run { queue.first { $0.id == id } }
-    }
-
-    private func markConverting(id: UUID) async {
-        await MainActor.run {
-            if let idx = queue.firstIndex(where: { $0.id == id }) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    queue[idx].status = .converting(progress: 0)
-                }
-            }
-        }
-    }
-
-    private func applyResult(id: UUID, result: ConvertStatus) async {
-        await MainActor.run {
-            guard let idx = queue.firstIndex(where: { $0.id == id }) else { return }
-            switch result {
-            case .converted(let url):
-                queue[idx].destinationURL = url
-                queue[idx].status = .completed
-                Task { await self.generateThumbnail(for: id, url: url) }
-            case .skipped(let url):
-                queue[idx].destinationURL = url
-                queue[idx].status = .completed
-            case .error(_, let message):
-                queue[idx].status = .failed
-                queue[idx].errorMessage = message
-            }
+    private func applyResult(id: UUID, result: ConvertStatus) {
+        guard let idx = queue.firstIndex(where: { $0.id == id }) else { return }
+        switch result {
+        case .converted(let url):
+            queue[idx].destinationURL = url
+            queue[idx].status = .completed
+            Task { await self.generateThumbnail(for: id, url: url) }
+        case .skipped(let url):
+            queue[idx].destinationURL = url
+            queue[idx].status = .skipped
+        case .error(_, let message):
+            queue[idx].status = .failed
+            queue[idx].errorMessage = message
         }
     }
 
@@ -171,20 +152,18 @@ final class ConversionRunner: ObservableObject {
             let start = Date()
             while !Task.isCancelled {
                 let elapsed = Date().timeIntervalSince(start)
-                // Asymptotic curve — caps near 0.95
+                // Asymptotic curve — caps near 0.95 so the bar doesn't hit 100% before completion.
                 let p = min(0.95, 1.0 - exp(-elapsed / 0.4))
-                await self?.updateProgress(id: id, progress: p)
+                self?.updateProgress(id: id, progress: p)
                 try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
     }
 
-    private func updateProgress(id: UUID, progress: Double) async {
-        await MainActor.run {
-            if let idx = queue.firstIndex(where: { $0.id == id }),
-               case .converting = queue[idx].status {
-                queue[idx].status = .converting(progress: progress)
-            }
+    private func updateProgress(id: UUID, progress: Double) {
+        if let idx = queue.firstIndex(where: { $0.id == id }),
+           case .converting = queue[idx].status {
+            queue[idx].status = .converting(progress: progress)
         }
     }
 
@@ -201,28 +180,40 @@ final class ConversionRunner: ObservableObject {
             return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
         }.value
 
-        await MainActor.run {
-            if let idx = queue.firstIndex(where: { $0.id == id }) {
-                queue[idx].thumbnailData = data
-            }
+        if let idx = queue.firstIndex(where: { $0.id == id }) {
+            queue[idx].thumbnailData = data
         }
     }
 
-    private func fireCompletionNotificationIfAppropriate() async {
-        let (completed, failed, isKey) = await MainActor.run {
-            (queue.filter { $0.status == .completed }.count,
-             queue.filter { $0.status == .failed }.count,
-             panelIsKey)
+    private func fireCompletionNotificationIfAppropriate() {
+        guard !panelIsKey else { return }
+        var converted = 0, skipped = 0, failed = 0
+        for item in queue {
+            switch item.status {
+            case .completed:                    converted += 1
+            case .skipped:                      skipped += 1
+            case .failed:                       failed += 1
+            case .waiting, .converting:         break
+            }
         }
-        guard !isKey else { return }
-        guard completed + failed > 0 else { return }
-        var parts = ["Converted \(completed)"]
+        guard converted + skipped + failed > 0 else { return }
+
+        var parts = ["Converted \(converted)"]
+        if skipped > 0 { parts.append("skipped \(skipped)") }
         if failed > 0 { parts.append("failed \(failed)") }
         Notifier.notify(title: "Loosey Goosey", body: parts.joined(separator: ", "))
     }
 }
 
-// MARK: - Notifier (preserved from existing code)
+#if DEBUG
+extension ConversionRunner {
+    /// Test seam: allows tests to set item status directly so they can verify
+    /// behavior that depends on specific queue states without running real conversions.
+    func _testSetStatus(_ status: QueueItem.Status, at index: Int) {
+        queue[index].status = status
+    }
+}
+#endif
 
 enum Notifier {
     private static var requested = false

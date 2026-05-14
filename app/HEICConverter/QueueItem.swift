@@ -23,6 +23,14 @@ struct QueueItem: Identifiable, Equatable {
         case waiting
         case converting(progress: Double)
         case completed
+        case skipped
         case failed
+
+        var isTerminal: Bool {
+            switch self {
+            case .completed, .skipped, .failed: return true
+            case .waiting, .converting:         return false
+            }
+        }
     }
 }

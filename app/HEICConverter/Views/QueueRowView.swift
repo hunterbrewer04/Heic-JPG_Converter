@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct QueueRowView: View {
     let item: QueueItem
@@ -54,6 +55,10 @@ struct QueueRowView: View {
             Text("Converted to JPG")
                 .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
+        case .skipped:
+            Text("Already exists")
+                .font(Theme.Typography.labelMd)
+                .foregroundStyle(Theme.Color.onSurfaceVariant)
         case .failed:
             Text(item.errorMessage ?? "Failed")
                 .font(Theme.Typography.labelMd)
@@ -71,7 +76,7 @@ struct QueueRowView: View {
                 .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
                 .monospacedDigit()
-        case .completed:
+        case .completed, .skipped:
             Button(action: onShow) {
                 Text("Show")
                     .font(Theme.Typography.labelMd.weight(.semibold))

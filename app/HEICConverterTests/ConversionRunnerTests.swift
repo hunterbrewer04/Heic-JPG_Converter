@@ -20,15 +20,34 @@ final class ConversionRunnerTests: XCTestCase {
         XCTAssertEqual(runner.queue.count, 2)
     }
 
-    func testClearCompletedRemovesOnlyCompletedAndFailed() {
+    func testClearCompletedRemovesTerminalStatesOnly() {
         let runner = ConversionRunner()
         runner.enqueue([
-            URL(fileURLWithPath: "/tmp/x.heic"),
-            URL(fileURLWithPath: "/tmp/y.heic"),
+            URL(fileURLWithPath: "/tmp/converted.heic"),
+            URL(fileURLWithPath: "/tmp/skipped.heic"),
+            URL(fileURLWithPath: "/tmp/failed.heic"),
+            URL(fileURLWithPath: "/tmp/waiting.heic"),
+            URL(fileURLWithPath: "/tmp/converting.heic"),
         ])
-        // Manually mutate status via reflection-friendly approach:
-        // Since `queue` is private(set), we test only what's observable.
-        // For deeper testing, expose an internal `_testHelper_setStatus` if needed.
-        XCTAssertEqual(runner.queue.count, 2)
+        XCTAssertEqual(runner.queue.count, 5)
+
+        runner._testSetStatus(.completed, at: 0)
+        runner._testSetStatus(.skipped, at: 1)
+        runner._testSetStatus(.failed, at: 2)
+        // index 3 stays .waiting
+        runner._testSetStatus(.converting(progress: 0.5), at: 4)
+
+        runner.clearCompleted()
+
+        XCTAssertEqual(runner.queue.count, 2, "only .waiting and .converting should remain")
+        XCTAssertEqual(runner.queue[0].status, .waiting)
+        XCTAssertEqual(runner.queue[1].status, .converting(progress: 0.5))
+    }
+
+    func testHasInflightTreatsSkippedAsTerminal() {
+        let runner = ConversionRunner()
+        runner.enqueue([URL(fileURLWithPath: "/tmp/only.heic")])
+        runner._testSetStatus(.skipped, at: 0)
+        XCTAssertFalse(runner.hasInflight, "skipped items are terminal and don't block quit")
     }
 }
