@@ -46,13 +46,10 @@ struct QueueRowView: View {
                 .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
         case .converting(let progress):
-            ZStack(alignment: .leading) {
-                Capsule().fill(Theme.Color.outlineVariant.opacity(0.3))
-                    .frame(height: 4)
-                Capsule().fill(Theme.Color.primary)
-                    .frame(width: 180 * progress, height: 4)
-            }
-            .frame(width: 180)
+            ProgressView(value: progress)
+                .progressViewStyle(.linear)
+                .tint(Theme.Color.primary)
+                .frame(width: 180)
         case .completed:
             Text("Converted to JPG")
                 .font(Theme.Typography.labelMd)
