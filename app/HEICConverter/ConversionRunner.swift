@@ -24,11 +24,13 @@ final class ConversionRunner: ObservableObject {
 
     func enqueue(_ urls: [URL]) {
         let expanded = HEICScanner.collectHEICFiles(from: urls)
-        let existing = Set(queue.map { $0.sourceURL })
-        let newItems = expanded
-            .map { $0.standardizedFileURL }
-            .filter { !existing.contains($0) }
-            .map { QueueItem(sourceURL: $0) }
+        var seen = Set(queue.map { $0.sourceURL })
+        var newItems: [QueueItem] = []
+        for url in expanded.map({ $0.standardizedFileURL }) {
+            if seen.insert(url).inserted {
+                newItems.append(QueueItem(sourceURL: url))
+            }
+        }
 
         guard !newItems.isEmpty else { return }
         queue.append(contentsOf: newItems)
