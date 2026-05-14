@@ -134,17 +134,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Click-outside-to-dismiss
 
-    /// Listens for mouse-UP events outside our app. mouseUp (not mouseDown) is the
-    /// correct event: a drag that starts in Finder and ends inside our panel fires
-    /// mouseUp inside our process, where global monitors don't see it — so the drop
-    /// completes. A click-and-release fully outside our app fires here and dismisses.
+    /// Listens for mouse-UP events outside our app and dismisses the panel — unless
+    /// the cursor is over the panel at release time. That happens during drag-and-drop
+    /// from another app: the mouseUp is delivered to the drag source (e.g. Finder), so
+    /// our global monitor sees it even though the drop is landing inside our panel.
+    /// Without the frame check, every drop would dismiss the panel before the user
+    /// can see the result.
     private func installClickOutsideMonitor() {
         removeClickOutsideMonitor()
         clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseUp, .rightMouseUp]
         ) { [weak self] _ in
-            // Global monitor callbacks are delivered on the main thread by AppKit.
-            MainActor.assumeIsolated { self?.hidePanel() }
+            MainActor.assumeIsolated {
+                guard let self, let panel = self.panel, panel.isVisible else { return }
+                if panel.frame.contains(NSEvent.mouseLocation) { return }
+                self.hidePanel()
+            }
         }
     }
 
