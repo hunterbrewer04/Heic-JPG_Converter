@@ -198,14 +198,17 @@ enum Theme {
     }
 
     // MARK: - Typography (SF Pro — DESIGN.md sizes preserved)
-    enum Type {
-        static let headlineLg = Font.system(size: 24, weight: .semibold).tracking(-0.48)
-        static let headlineMd = Font.system(size: 18, weight: .semibold).tracking(-0.18)
-        static let bodyLg     = Font.system(size: 15, weight: .regular).tracking(-0.15)
+    // Note: `Type` is reserved in Swift; this enum is named `Typography`.
+    // `Font` has no `.tracking()` method; if tracking is needed, apply it
+    // via the View-level `.tracking(_:)` modifier on Text at the call site.
+    enum Typography {
+        static let headlineLg = Font.system(size: 24, weight: .semibold)
+        static let headlineMd = Font.system(size: 18, weight: .semibold)
+        static let bodyLg     = Font.system(size: 15, weight: .regular)
         static let bodyMd     = Font.system(size: 13, weight: .regular)
         static let bodyMdMed  = Font.system(size: 13, weight: .medium)
-        static let labelMd    = Font.system(size: 11, weight: .medium).tracking(0.22)
-        static let labelSm    = Font.system(size: 10, weight: .semibold).tracking(0.5)
+        static let labelMd    = Font.system(size: 11, weight: .medium)
+        static let labelSm    = Font.system(size: 10, weight: .semibold)
     }
 
     // MARK: - Geometry
@@ -987,7 +990,7 @@ struct PanelHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             Text("Loosey Goosey")
-                .font(Theme.Type.headlineMd)
+                .font(Theme.Typography.headlineMd)
                 .foregroundStyle(Theme.Color.onSurface)
             Spacer()
             Button {
@@ -1066,10 +1069,10 @@ struct DropZone: View {
                         .foregroundStyle(Theme.Color.onPrimary)
                 }
                 Text("Drag & Drop HEIC files")
-                    .font(Theme.Type.bodyLg)
+                    .font(Theme.Typography.bodyLg)
                     .foregroundStyle(Theme.Color.onSurface)
                 Text("or click to browse")
-                    .font(Theme.Type.bodyMd)
+                    .font(Theme.Typography.bodyMd)
                     .foregroundStyle(Theme.Color.onSurfaceVariant)
             }
             .frame(maxWidth: .infinity)
@@ -1191,7 +1194,7 @@ struct QueueRowView: View {
             thumbnail
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.filename)
-                    .font(Theme.Type.bodyMdMed)
+                    .font(Theme.Typography.bodyMdMed)
                     .foregroundStyle(Theme.Color.onSurface)
                     .lineLimit(1)
                 statusLine
@@ -1225,7 +1228,7 @@ struct QueueRowView: View {
         switch item.status {
         case .waiting:
             Text("Waiting…")
-                .font(Theme.Type.labelMd)
+                .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
         case .converting(let progress):
             ZStack(alignment: .leading) {
@@ -1237,11 +1240,11 @@ struct QueueRowView: View {
             .frame(width: 180)
         case .completed:
             Text("Converted to JPG")
-                .font(Theme.Type.labelMd)
+                .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
         case .failed:
             Text(item.errorMessage ?? "Failed")
-                .font(Theme.Type.labelMd)
+                .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.error)
                 .lineLimit(1)
         }
@@ -1253,13 +1256,13 @@ struct QueueRowView: View {
             EmptyView()
         case .converting(let progress):
             Text("\(Int(progress * 100))%")
-                .font(Theme.Type.labelMd)
+                .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
                 .monospacedDigit()
         case .completed:
             Button(action: onShow) {
                 Text("Show")
-                    .font(Theme.Type.labelMd.weight(.semibold))
+                    .font(Theme.Typography.labelMd.weight(.semibold))
                     .foregroundStyle(Theme.Color.onPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
@@ -1327,7 +1330,7 @@ struct QueueSection: View {
         if !runner.queue.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text("CONVERSION QUEUE")
-                    .font(Theme.Type.labelSm)
+                    .font(Theme.Typography.labelSm)
                     .foregroundStyle(Theme.Color.onSurfaceVariant)
                     .textCase(.uppercase)
                     .padding(.horizontal, Theme.Space.container)
@@ -1413,7 +1416,7 @@ struct PanelFooter: View {
     var body: some View {
         HStack {
             Text("v\(version)")
-                .font(Theme.Type.labelSm)
+                .font(Theme.Typography.labelSm)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
             Spacer()
             Button("Open Folder") {
@@ -1445,7 +1448,7 @@ private struct FooterLinkStyle: ButtonStyle {
     let enabled: Bool
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Theme.Type.labelMd)
+            .font(Theme.Typography.labelMd)
             .foregroundStyle(enabled
                 ? Theme.Color.primary
                 : Theme.Color.onSurfaceVariant.opacity(0.4))
@@ -1694,13 +1697,13 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.gutter) {
             Text("Settings")
-                .font(Theme.Type.headlineMd)
+                .font(Theme.Typography.headlineMd)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Output Folder").font(Theme.Type.labelMd)
+                Text("Output Folder").font(Theme.Typography.labelMd)
                 HStack {
                     Text(URL(fileURLWithPath: outputDir).lastPathComponent)
-                        .font(Theme.Type.bodyMd)
+                        .font(Theme.Typography.bodyMd)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
@@ -1716,10 +1719,10 @@ struct SettingsView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("JPEG Quality").font(Theme.Type.labelMd)
+                    Text("JPEG Quality").font(Theme.Typography.labelMd)
                     Spacer()
                     Text("\(quality)")
-                        .font(Theme.Type.bodyMd.monospacedDigit())
+                        .font(Theme.Typography.bodyMd.monospacedDigit())
                 }
                 Slider(value: Binding(
                     get: { Double(quality) },
@@ -1728,9 +1731,9 @@ struct SettingsView: View {
             }
 
             Toggle("Archive originals to heic_originals/", isOn: $archive)
-                .font(Theme.Type.bodyMd)
+                .font(Theme.Typography.bodyMd)
             Toggle("Overwrite existing JPEGs", isOn: $force)
-                .font(Theme.Type.bodyMd)
+                .font(Theme.Typography.bodyMd)
         }
         .padding(Theme.Space.container)
     }
