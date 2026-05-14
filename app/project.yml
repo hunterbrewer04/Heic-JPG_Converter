@@ -10,11 +10,9 @@ targets:
     platform: macOS
     sources:
       - path: HEICConverter
-    info:
-      path: HEICConverter/Info.plist
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.heicconverter.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.hunterbrewer.heicconverter
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
@@ -23,3 +21,29 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: HEICConverter/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: "Loosey Goosey"
+
+  HEICConverterTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: HEICConverterTests
+    dependencies:
+      - target: HEICConverter
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/HEICConverter.app/Contents/MacOS/HEICConverter"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  HEICConverter:
+    build:
+      targets:
+        HEICConverter: all
+        HEICConverterTests: [test]
+    test:
+      targets:
+        - HEICConverterTests

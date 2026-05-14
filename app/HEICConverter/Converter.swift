@@ -40,6 +40,10 @@ struct Converter: Sendable {
             return .skipped(targetURL)
         }
 
+        if Task.isCancelled {
+            return .skipped(targetURL)
+        }
+
         do {
             guard let src = CGImageSourceCreateWithURL(source as CFURL, nil) else {
                 throw ConvertError.cannotOpen
@@ -58,6 +62,10 @@ struct Converter: Sendable {
             ]
             // Copies image + all metadata (EXIF, GPS, orientation, ICC) from source.
             CGImageDestinationAddImageFromSource(dst, src, 0, opts as CFDictionary)
+
+            if Task.isCancelled {
+                return .skipped(targetURL)
+            }
 
             guard CGImageDestinationFinalize(dst) else {
                 throw ConvertError.writeFailed
