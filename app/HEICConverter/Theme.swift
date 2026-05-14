@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import Foundation
 
 enum Theme {
 

@@ -10,7 +10,7 @@ struct PanelFooter: View {
     }
 
     private var canClear: Bool {
-        runner.queue.contains { $0.status == .completed || $0.status == .failed }
+        runner.queue.contains { $0.status.isTerminal }
     }
 
     var body: some View {
