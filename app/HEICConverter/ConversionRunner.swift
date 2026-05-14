@@ -30,12 +30,10 @@ final class ConversionRunner: ObservableObject {
         let converter = makeConverterFromSettings()
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            var files = Scanner.collectHEICFiles(from: inputs)
-            if let outputDir = converter.outputDirectory {
-                files = Scanner.dedupeByOutput(files, outputDir: outputDir)
-            }
+            var files = HEICScanner.collectHEICFiles(from: inputs)
+            files = HEICScanner.dedupeByOutput(files, outputDir: converter.outputDirectory)
             guard !files.isEmpty else {
-                await self?.finish(converted: 0, skipped: 0, errored: 0, empty: true)
+                await self?.finish(converted: 0, skipped: 0, failed: 0, empty: true)
                 return
             }
 
@@ -50,24 +48,35 @@ final class ConversionRunner: ObservableObject {
 
             await self?.setRunning(done: 0, total: files.count)
 
-            var converted = 0, skipped = 0, errored = 0, done = 0
+            // Bounded concurrency: keep at most `maxConcurrent` decodes in flight at
+            // once. CGImageSource/CGImageDestination hold the decoded frame in
+            // memory, so an unbounded TaskGroup can balloon memory on large batches.
+            let maxConcurrent = ProcessInfo.processInfo.activeProcessorCount
+            var converted = 0, skipped = 0, failed = 0, done = 0
+            let total = files.count
+
             await withTaskGroup(of: ConvertStatus.self) { group in
-                for f in files {
-                    group.addTask { converter.convert(f) }
+                var iterator = files.makeIterator()
+                for _ in 0..<min(maxConcurrent, total) {
+                    guard let next = iterator.next() else { break }
+                    group.addTask { converter.convert(next) }
                 }
-                for await result in group {
+                while let result = await group.next() {
                     switch result {
                     case .converted: converted += 1
                     case .skipped:   skipped += 1
-                    case .error:     errored += 1
+                    case .error:     failed += 1
                     }
                     done += 1
-                    await self?.setRunning(done: done, total: files.count)
+                    await self?.setRunning(done: done, total: total)
+                    if let next = iterator.next() {
+                        group.addTask { converter.convert(next) }
+                    }
                 }
             }
 
             await self?.finish(
-                converted: converted, skipped: skipped, errored: errored, empty: false)
+                converted: converted, skipped: skipped, failed: failed, empty: false)
         }
     }
 
@@ -75,28 +84,45 @@ final class ConversionRunner: ObservableObject {
         state = .running(done: done, total: total)
     }
 
-    private func finish(converted: Int, skipped: Int, errored: Int, empty: Bool) {
-        let body = empty
-            ? "No HEIC files found."
-            : "Converted \(converted), skipped \(skipped), errored \(errored)"
+    private func finish(converted: Int, skipped: Int, failed: Int, empty: Bool) {
+        let body: String
+        if empty {
+            body = "No HEIC files found."
+        } else {
+            var parts = ["Converted \(converted)"]
+            if skipped > 0 { parts.append("skipped \(skipped)") }
+            if failed > 0  { parts.append("failed \(failed)") }
+            body = parts.joined(separator: ", ")
+        }
         state = .finished(summary: body)
-        Notifier.send(title: "HEIC Converter", body: body)
+        Notifier.notify(title: "HEIC Converter", body: body)
     }
 }
 
 enum Notifier {
-    static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(
-            options: [.alert, .sound]) { _, _ in }
-    }
+    /// Request authorization on demand the first time we want to fire a
+    /// notification. Doing it from `App.init` would prompt before the user has
+    /// even clicked the menu bar icon; this defers it until first conversion.
+    private static var requested = false
 
-    static func send(title: String, body: String) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        let req = UNNotificationRequest(
-            identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+    static func notify(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        let send = {
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let req = UNNotificationRequest(
+                identifier: UUID().uuidString, content: content, trigger: nil)
+            center.add(req, withCompletionHandler: nil)
+        }
+        if requested {
+            send()
+            return
+        }
+        requested = true
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            if granted { send() }
+        }
     }
 }

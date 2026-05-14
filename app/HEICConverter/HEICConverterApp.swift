@@ -4,10 +4,6 @@ import SwiftUI
 struct HEICConverterApp: App {
     @StateObject private var runner = ConversionRunner()
 
-    init() {
-        Notifier.requestAuthorization()
-    }
-
     var body: some Scene {
         MenuBarExtra("HEIC Converter", systemImage: "photo.on.rectangle.angled") {
             MenuContentView()

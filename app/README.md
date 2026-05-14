@@ -67,7 +67,7 @@ Drop `HEICConverter.app` into `/Applications`. Add it under
 | `MenuContentView.swift` | Menu items, settings submenu | (new) |
 | `ConversionRunner.swift` | Background `TaskGroup` + notification | `main()` |
 | `Converter.swift` | `CGImageSource` → JPEG with metadata | `convert_one()` |
-| `Scanner.swift` | Recursive HEIC discovery, output de-dupe | `collect_files`, `dedupe_by_output` |
+| `Scanner.swift` | `HEICScanner` — recursive discovery, output de-dupe | `collect_files`, `dedupe_by_output` |
 | `Picker.swift` | `NSOpenPanel` wrappers | (was Automator) |
 | `Settings.swift` | `@AppStorage` keys / defaults | argparse defaults |
 | `Info.plist` | `LSUIElement = YES`, macOS 13 minimum | (new) |

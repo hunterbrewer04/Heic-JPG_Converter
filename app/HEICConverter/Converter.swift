@@ -10,12 +10,14 @@ enum ConvertStatus {
 
 enum ConvertError: Error, CustomStringConvertible {
     case cannotOpen
+    case noImagesInSource
     case cannotCreateDestination
     case writeFailed
 
     var description: String {
         switch self {
         case .cannotOpen: return "cannot open source image"
+        case .noImagesInSource: return "source contains no images"
         case .cannotCreateDestination: return "cannot create JPEG destination"
         case .writeFailed: return "JPEG write failed"
         }
@@ -42,6 +44,9 @@ struct Converter: Sendable {
             guard let src = CGImageSourceCreateWithURL(source as CFURL, nil) else {
                 throw ConvertError.cannotOpen
             }
+            guard CGImageSourceGetCount(src) > 0 else {
+                throw ConvertError.noImagesInSource
+            }
             guard let dst = CGImageDestinationCreateWithURL(
                 targetURL as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
             else {
@@ -64,14 +69,8 @@ struct Converter: Sendable {
         }
 
         if archiveOriginals {
-            let archiveDir = source.deletingLastPathComponent()
-                .appendingPathComponent("heic_originals")
             do {
-                try FileManager.default.createDirectory(
-                    at: archiveDir, withIntermediateDirectories: true)
-                try FileManager.default.moveItem(
-                    at: source,
-                    to: archiveDir.appendingPathComponent(source.lastPathComponent))
+                try archiveOriginal(source)
             } catch {
                 return .error(
                     source,
@@ -80,5 +79,27 @@ struct Converter: Sendable {
         }
 
         return .converted(targetURL)
+    }
+
+    /// Move `source` into a sibling `heic_originals/`, adding a numbered suffix
+    /// (`name (2).HEIC`, `name (3).HEIC`, …) if a file with the same name was
+    /// already archived from a different folder in this batch.
+    private func archiveOriginal(_ source: URL) throws {
+        let fm = FileManager.default
+        let archiveDir = source.deletingLastPathComponent()
+            .appendingPathComponent("heic_originals")
+        try fm.createDirectory(at: archiveDir, withIntermediateDirectories: true)
+
+        let stem = source.deletingPathExtension().lastPathComponent
+        let ext = source.pathExtension
+        var candidate = archiveDir.appendingPathComponent(source.lastPathComponent)
+        var n = 2
+        while fm.fileExists(atPath: candidate.path) {
+            candidate = archiveDir
+                .appendingPathComponent("\(stem) (\(n))")
+                .appendingPathExtension(ext)
+            n += 1
+        }
+        try fm.moveItem(at: source, to: candidate)
     }
 }
