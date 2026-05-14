@@ -71,13 +71,11 @@ struct DropZone: View {
             }
         }
         group.notify(queue: .main) {
-            let heics = urls.filter {
-                $0.pathExtension.lowercased() == "heic" || $0.hasDirectoryPath
-            }
-            if heics.isEmpty {
+            let heicCount = HEICScanner.collectHEICFiles(from: urls).count
+            if heicCount == 0 {
                 triggerShake()
             } else {
-                runner.enqueue(heics)
+                runner.enqueue(urls)
             }
         }
     }
