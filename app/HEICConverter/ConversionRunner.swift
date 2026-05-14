@@ -7,23 +7,12 @@ import UserNotifications
 @MainActor
 final class ConversionRunner: ObservableObject {
     @Published private(set) var queue: [QueueItem] = []
-    private var panelIsKey: Bool = false
+    private(set) var panelIsKey: Bool = false
 
     private var processorTask: Task<Void, Never>?
 
-    init() {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.panelIsKey = true }
-        }
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.panelIsKey = false }
-        }
+    func setPanelVisible(_ visible: Bool) {
+        panelIsKey = visible
     }
 
     var hasInflight: Bool {
