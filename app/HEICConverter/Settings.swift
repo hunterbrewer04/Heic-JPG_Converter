@@ -2,16 +2,18 @@ import Foundation
 import SwiftUI
 
 enum SettingsKey {
-    static let quality   = "quality"
-    static let archive   = "archiveOriginals"
-    static let force     = "forceOverwrite"
-    static let outputDir = "outputDirectory"
+    static let quality      = "quality"
+    static let archive      = "archiveOriginals"
+    static let force        = "forceOverwrite"
+    static let outputDir    = "outputDirectory"
+    static let outputFormat = "outputFormat"
 }
 
 struct Defaults {
-    static let quality = 95
-    static let archive = false
-    static let force   = false
+    static let quality      = 95
+    static let archive      = false
+    static let force        = false
+    static let outputFormat = SupportedFormat.default.rawValue
 
     /// Default output directory is the user's Downloads folder path,
     /// or empty (meaning "alongside source") if it can't be located.
@@ -26,11 +28,13 @@ struct Defaults {
 func makeConverterFromSettings(outputDirectory: URL) -> Converter {
     let d = UserDefaults.standard
     let q = d.object(forKey: SettingsKey.quality) as? Int ?? Defaults.quality
+    let format = SupportedFormat.from(rawValue: d.string(forKey: SettingsKey.outputFormat))
     return Converter(
         quality: Double(q) / 100.0,
         archiveOriginals: d.bool(forKey: SettingsKey.archive),
         force: d.bool(forKey: SettingsKey.force),
-        outputDirectory: outputDirectory)
+        outputDirectory: outputDirectory,
+        format: format)
 }
 
 enum OutputDirectoryResolver {

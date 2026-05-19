@@ -1,9 +1,11 @@
-# HEIC Converter — macOS Menu Bar App
+# Image Converter — macOS Menu Bar App
 
 A native SwiftUI / `MenuBarExtra` rewrite of the Python CLI. Lives in the
-macOS top bar; click → pick a folder or some HEIC files → JPEGs land next to
-the originals (or in a custom output folder). EXIF, GPS, orientation and ICC
-profile carry over.
+macOS top bar; click → pick a folder or some images → converted files land
+next to the originals (or in a custom output folder). Accepts HEIC, JPG, PNG,
+GIF, TIFF, BMP and WEBP as input; converts to JPEG, PNG, or GIF (pick the
+target with the segmented control above the drop zone). EXIF, GPS, orientation
+and ICC profile carry over for JPEG/PNG outputs.
 
 Requires macOS 13 Ventura or later. Xcode 15+ to build.
 
@@ -66,8 +68,10 @@ Drop `HEICConverter.app` into `/Applications`. Add it under
 | `HEICConverterApp.swift` | `@main`, `MenuBarExtra` scene | (new) |
 | `MenuContentView.swift` | Menu items, settings submenu | (new) |
 | `ConversionRunner.swift` | Background `TaskGroup` + notification | `main()` |
-| `Converter.swift` | `CGImageSource` → JPEG with metadata | `convert_one()` |
-| `Scanner.swift` | `HEICScanner` — recursive discovery, output de-dupe | `collect_files`, `dedupe_by_output` |
+| `Converter.swift` | `CGImageSource` → chosen format with metadata | `convert_one()` |
+| `Scanner.swift` | `ImageScanner` — recursive discovery, output de-dupe | `collect_files`, `dedupe_by_output` |
+| `SupportedFormat.swift` | Output format registry (JPEG/PNG/GIF) | `FORMATS` |
+| `Views/FormatPickerRow.swift` | Segmented picker above the drop zone | `--output-format` |
 | `Picker.swift` | `NSOpenPanel` wrappers | (was Automator) |
 | `Settings.swift` | `@AppStorage` keys / defaults | argparse defaults |
 | `Info.plist` | `LSUIElement = YES`, macOS 13 minimum | (new) |

@@ -14,10 +14,33 @@ final class ConversionRunnerTests: XCTestCase {
     func testEnqueueIgnoresAlreadyEnqueuedItems() {
         let runner = ConversionRunner()
         let a = URL(fileURLWithPath: "/tmp/a.heic")
-        let b = URL(fileURLWithPath: "/tmp/b.heic")
+        let b = URL(fileURLWithPath: "/tmp/b.png")
         runner.enqueue([a])
         runner.enqueue([a, b])
         XCTAssertEqual(runner.queue.count, 2)
+    }
+
+    func testEnqueueAcceptsMixedImageExtensions() {
+        let runner = ConversionRunner()
+        runner.enqueue([
+            URL(fileURLWithPath: "/tmp/a.heic"),
+            URL(fileURLWithPath: "/tmp/b.jpg"),
+            URL(fileURLWithPath: "/tmp/c.png"),
+            URL(fileURLWithPath: "/tmp/d.gif"),
+            URL(fileURLWithPath: "/tmp/e.txt"),
+        ])
+        XCTAssertEqual(runner.queue.count, 4, ".txt is rejected; the four images enqueue")
+    }
+
+    func testDedupeByOutputUsesSelectedFormatExtension() {
+        // Two inputs collide on the same PNG target name.
+        let inputs = [
+            URL(fileURLWithPath: "/tmp/photo.heic"),
+            URL(fileURLWithPath: "/tmp/photo.jpg"),
+        ]
+        let deduped = ImageScanner.dedupeByOutput(
+            inputs, outputDir: URL(fileURLWithPath: "/tmp/out"), outputExtension: "png")
+        XCTAssertEqual(deduped.count, 1, "different inputs targeting the same png path collapse")
     }
 
     func testClearCompletedRemovesTerminalStatesOnly() {

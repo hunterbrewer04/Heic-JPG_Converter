@@ -2,10 +2,15 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
-    @AppStorage(SettingsKey.outputDir) private var outputDir: String = Defaults.outputDirPath
-    @AppStorage(SettingsKey.quality)   private var quality: Int = Defaults.quality
-    @AppStorage(SettingsKey.archive)   private var archive: Bool = Defaults.archive
-    @AppStorage(SettingsKey.force)     private var force: Bool = Defaults.force
+    @AppStorage(SettingsKey.outputDir)    private var outputDir: String = Defaults.outputDirPath
+    @AppStorage(SettingsKey.quality)      private var quality: Int = Defaults.quality
+    @AppStorage(SettingsKey.archive)      private var archive: Bool = Defaults.archive
+    @AppStorage(SettingsKey.force)        private var force: Bool = Defaults.force
+    @AppStorage(SettingsKey.outputFormat) private var outputFormatRaw: String = Defaults.outputFormat
+
+    private var outputFormat: SupportedFormat {
+        SupportedFormat.from(rawValue: outputFormatRaw)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.gutter) {
@@ -30,22 +35,24 @@ struct SettingsView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("JPEG Quality").font(Theme.Typography.labelMd)
-                    Spacer()
-                    Text("\(quality)")
-                        .font(Theme.Typography.bodyMd.monospacedDigit())
+            if outputFormat.supportsQuality {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Quality").font(Theme.Typography.labelMd)
+                        Spacer()
+                        Text("\(quality)")
+                            .font(Theme.Typography.bodyMd.monospacedDigit())
+                    }
+                    Slider(value: Binding(
+                        get: { Double(quality) },
+                        set: { quality = Int($0) }
+                    ), in: 60...100, step: 5)
                 }
-                Slider(value: Binding(
-                    get: { Double(quality) },
-                    set: { quality = Int($0) }
-                ), in: 60...100, step: 5)
             }
 
-            Toggle("Archive originals to heic_originals/", isOn: $archive)
+            Toggle("Archive originals to image_originals/", isOn: $archive)
                 .font(Theme.Typography.bodyMd)
-            Toggle("Overwrite existing JPEGs", isOn: $force)
+            Toggle("Overwrite existing files", isOn: $force)
                 .font(Theme.Typography.bodyMd)
         }
         .padding(Theme.Space.container)

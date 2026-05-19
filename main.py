@@ -8,6 +8,7 @@ import subprocess
 import sys
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -24,15 +25,48 @@ class Status(str, Enum):
     ERROR = "error"
 
 
+@dataclass(frozen=True)
+class FormatSpec:
+    extension: str          # output suffix (no leading dot)
+    pillow_format: str      # value for Image.save(format=...)
+    supports_quality: bool  # JPEG only
+    needs_rgb: bool         # JPEG and GIF lose / quantize alpha
+
+
+FORMATS: dict[str, FormatSpec] = {
+    "jpg": FormatSpec("jpg", "JPEG", supports_quality=True,  needs_rgb=True),
+    "png": FormatSpec("png", "PNG",  supports_quality=False, needs_rgb=False),
+    "gif": FormatSpec("gif", "GIF",  supports_quality=False, needs_rgb=True),
+}
+
+INPUT_EXTENSIONS: frozenset[str] = frozenset({
+    ".heic", ".heif", ".jpg", ".jpeg", ".png", ".gif",
+    ".tif", ".tiff", ".bmp", ".webp",
+})
+
+# Aliases used for the same-format skip check (".jpeg" inputs map to "jpg" output).
+_EXTENSION_ALIASES: dict[str, str] = {"jpeg": "jpg", "tiff": "tif"}
+
+
+def _normalized_ext(path: Path) -> str:
+    raw = path.suffix.lower().lstrip(".")
+    return _EXTENSION_ALIASES.get(raw, raw)
+
+
 def convert_one(
     image_file: Path,
     output_dir: Path | None,
     quality: int,
     archive: bool,
     force: bool,
+    format_key: str,
 ) -> tuple[Status, str]:
+    spec = FORMATS[format_key]
     target_dir = output_dir or image_file.parent
-    new_name = target_dir / image_file.with_suffix(".jpg").name
+    new_name = target_dir / (image_file.stem + "." + spec.extension)
+
+    if not force and _normalized_ext(image_file) == spec.extension:
+        return Status.SKIPPED, f"{image_file.name} is already {spec.extension}"
 
     if new_name.exists() and not force:
         return Status.SKIPPED, f"{new_name.name} already exists"
@@ -40,18 +74,23 @@ def convert_one(
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
         with Image.open(image_file) as image:
-            save_kwargs = {"quality": quality, "subsampling": 0}
-            if exif := image.info.get("exif"):
-                save_kwargs["exif"] = exif
-            if icc := image.info.get("icc_profile"):
-                save_kwargs["icc_profile"] = icc
-            image.convert("RGB").save(new_name, **save_kwargs)
+            save_kwargs: dict = {}
+            if spec.supports_quality:
+                save_kwargs["quality"] = quality
+                save_kwargs["subsampling"] = 0
+            if spec.pillow_format in ("JPEG", "PNG"):
+                if exif := image.info.get("exif"):
+                    save_kwargs["exif"] = exif
+                if icc := image.info.get("icc_profile"):
+                    save_kwargs["icc_profile"] = icc
+            img = image.convert("RGB") if spec.needs_rgb else image
+            img.save(new_name, format=spec.pillow_format, **save_kwargs)
     except Exception as e:
         return Status.ERROR, f"{image_file.name}: {e}"
 
     if archive:
         try:
-            archive_dir = image_file.parent / "heic_originals"
+            archive_dir = image_file.parent / "image_originals"
             archive_dir.mkdir(exist_ok=True)
             shutil.move(image_file, archive_dir / image_file.name)
         except Exception as e:
@@ -74,22 +113,24 @@ def collect_files(paths: list[Path]) -> list[Path]:
     files: list[Path] = []
     for p in paths:
         if p.is_file():
-            if p.suffix.lower() == ".heic":
+            if p.suffix.lower() in INPUT_EXTENSIONS:
                 files.append(p)
             else:
-                print(f"Warning: {p} is not a HEIC file, skipping")
+                print(f"Warning: {p} is not a supported image, skipping")
         elif p.is_dir():
-            files.extend(p.rglob("*.[hH][eE][iI][Cc]"))
+            for child in p.rglob("*"):
+                if child.is_file() and child.suffix.lower() in INPUT_EXTENSIONS:
+                    files.append(child)
         else:
             print(f"Warning: {p} is not a file or folder, skipping")
     return files
 
 
-def dedupe_by_output(files: list[Path], output_dir: Path) -> list[Path]:
+def dedupe_by_output(files: list[Path], output_dir: Path, extension: str) -> list[Path]:
     seen: dict[Path, Path] = {}
     deduped: list[Path] = []
     for f in files:
-        target = output_dir / f.with_suffix(".jpg").name
+        target = output_dir / (f.stem + "." + extension)
         if target in seen:
             print(
                 f"Warning: {f} collides with {seen[target]} at {target.name}; "
@@ -116,26 +157,30 @@ def jobs_arg(value: str) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert HEIC images to JPG.")
+    parser = argparse.ArgumentParser(description="Convert images between HEIC, JPG, PNG, and GIF.")
     parser.add_argument(
         "paths", nargs="+", type=Path,
-        help="HEIC file(s) or folder(s) to convert",
+        help="Image file(s) or folder(s) to convert",
     )
     parser.add_argument(
         "-o", "--output", type=Path, default=None,
         help="Output folder (default: alongside source)",
     )
     parser.add_argument(
+        "-f", "--output-format", choices=list(FORMATS.keys()), default="jpg",
+        help="Output format: jpg, png, or gif (default: jpg)",
+    )
+    parser.add_argument(
         "-q", "--quality", type=quality_arg, default=95,
-        help="JPG quality 1-100 (default: 95)",
+        help="Output quality 1-100 (used only for JPG; default: 95)",
     )
     parser.add_argument(
         "--archive", action="store_true",
-        help="Move originals to heic_originals/ next to the source after success",
+        help="Move originals to image_originals/ next to the source after success",
     )
     parser.add_argument(
         "--force", action="store_true",
-        help="Overwrite existing .jpg files",
+        help="Overwrite existing output files (and re-encode same-format inputs)",
     )
     parser.add_argument(
         "-j", "--jobs", type=jobs_arg, default=os.cpu_count() or 1,
@@ -145,19 +190,19 @@ def main() -> None:
 
     files = collect_files(args.paths)
     if not files:
-        print("No HEIC files found.")
-        notify("HEIC Converter", "No HEIC files found.")
+        print("No supported images found.")
+        notify("HEIC Converter", "No supported images found.")
         return
 
     if args.output is not None:
-        files = dedupe_by_output(files, args.output)
+        files = dedupe_by_output(files, args.output, args.output_format)
 
     counts: Counter[Status] = Counter()
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         future_to_path = {
             pool.submit(
                 convert_one, f, args.output,
-                args.quality, args.archive, args.force,
+                args.quality, args.archive, args.force, args.output_format,
             ): f
             for f in files
         }

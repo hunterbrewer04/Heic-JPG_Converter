@@ -17,7 +17,7 @@ struct DropZone: View {
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(Theme.Color.onPrimary)
                 }
-                Text("Drag & Drop HEIC files")
+                Text("Drag & Drop images")
                     .font(Theme.Typography.bodyLg)
                     .foregroundStyle(Theme.Color.onSurface)
                 Text("or click to browse")
@@ -51,7 +51,7 @@ struct DropZone: View {
             handleDrop(providers: providers)
             return true
         }
-        .accessibilityLabel("Drop HEIC files or click to browse")
+        .accessibilityLabel("Drop images or click to browse")
     }
 
     private func openPicker() {
@@ -71,8 +71,8 @@ struct DropZone: View {
             }
         }
         group.notify(queue: .main) {
-            let heicCount = HEICScanner.collectHEICFiles(from: urls).count
-            if heicCount == 0 {
+            let imageCount = ImageScanner.collectImageFiles(from: urls).count
+            if imageCount == 0 {
                 triggerShake()
             } else {
                 runner.enqueue(urls)

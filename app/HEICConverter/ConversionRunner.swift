@@ -22,9 +22,12 @@ final class ConversionRunner: ObservableObject {
     // MARK: - Public API
 
     func enqueue(_ urls: [URL]) {
-        let expanded = HEICScanner.collectHEICFiles(from: urls)
+        let expanded = ImageScanner.collectImageFiles(from: urls)
         let outputDir = OutputDirectoryResolver.resolveFromDefaults()
-        let dedupedByTarget = HEICScanner.dedupeByOutput(expanded, outputDir: outputDir)
+        let format = SupportedFormat.from(
+            rawValue: UserDefaults.standard.string(forKey: SettingsKey.outputFormat))
+        let dedupedByTarget = ImageScanner.dedupeByOutput(
+            expanded, outputDir: outputDir, outputExtension: format.fileExtension)
 
         var seen = Set(queue.map { $0.sourceURL })
         var newItems: [QueueItem] = []

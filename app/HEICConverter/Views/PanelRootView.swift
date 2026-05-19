@@ -17,6 +17,7 @@ struct PanelRootView: View {
                     SettingsView()
                         .frame(width: 280)
                 }
+            FormatPickerRow()
             DropZone()
             QueueSection()
             PanelFooter()

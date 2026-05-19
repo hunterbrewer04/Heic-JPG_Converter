@@ -52,7 +52,7 @@ struct QueueRowView: View {
                 .tint(Theme.Color.primary)
                 .frame(width: 180)
         case .completed:
-            Text("Converted to JPG")
+            Text("Converted to \(item.destinationURL?.pathExtension.uppercased() ?? "image")")
                 .font(Theme.Typography.labelMd)
                 .foregroundStyle(Theme.Color.onSurfaceVariant)
         case .skipped:

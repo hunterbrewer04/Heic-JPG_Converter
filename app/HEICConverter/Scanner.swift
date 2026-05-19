@@ -1,9 +1,10 @@
 import Foundation
 
-enum HEICScanner {
-    /// Expand a mixed list of file and directory URLs into a flat list of HEIC files.
-    /// Directories are scanned recursively. Non-HEIC files are dropped.
-    static func collectHEICFiles(from inputs: [URL]) -> [URL] {
+enum ImageScanner {
+    /// Expand a mixed list of file and directory URLs into a flat list of supported
+    /// image files. Directories are scanned recursively. Files whose extension is
+    /// not in `SupportedFormat.knownImageExtensions` are dropped.
+    static func collectImageFiles(from inputs: [URL]) -> [URL] {
         var out: [URL] = []
         let fm = FileManager.default
 
@@ -14,28 +15,29 @@ enum HEICScanner {
                     includingPropertiesForKeys: nil,
                     options: [.skipsHiddenFiles])
                 else { continue }
-                for case let f as URL in it where isHEIC(f) {
+                for case let f as URL in it where isImage(f) {
                     out.append(f)
                 }
-            } else if isHEIC(url) {
+            } else if isImage(url) {
                 out.append(url)
             }
         }
         return out
     }
 
-    /// Drop entries that would write to the same JPEG path. APFS is case-insensitive
+    /// Drop entries that would write to the same output path. APFS is case-insensitive
     /// by default, so the key is the lowercased target path. Runs even when the
     /// output directory is implicit (alongside source), to catch sibling collisions
-    /// like `IMG_1.HEIC` + `img_1.heic` in the same folder.
-    static func dedupeByOutput(_ files: [URL], outputDir: URL?) -> [URL] {
+    /// like `IMG_1.HEIC` + `img_1.heic` in the same folder when both target the
+    /// same output extension.
+    static func dedupeByOutput(_ files: [URL], outputDir: URL?, outputExtension: String) -> [URL] {
         var seen: Set<String> = []
         var out: [URL] = []
         for f in files {
             let dir = outputDir ?? f.deletingLastPathComponent()
             let target = dir
                 .appendingPathComponent(f.deletingPathExtension().lastPathComponent)
-                .appendingPathExtension("jpg")
+                .appendingPathExtension(outputExtension)
             if seen.insert(target.path.lowercased()).inserted {
                 out.append(f)
             }
@@ -43,8 +45,8 @@ enum HEICScanner {
         return out
     }
 
-    private static func isHEIC(_ url: URL) -> Bool {
-        url.pathExtension.caseInsensitiveCompare("heic") == .orderedSame
+    private static func isImage(_ url: URL) -> Bool {
+        SupportedFormat.knownImageExtensions.contains(url.pathExtension.lowercased())
     }
 
     private static func isDirectory(_ url: URL) -> Bool {

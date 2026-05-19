@@ -13,9 +13,16 @@ Open `app/HEICConverter.xcodeproj` in Xcode (regenerate with `cd app && xcodegen
 - [ ] Panel is 340pt wide with rounded 24pt corners and a subtle inner-stroke gradient.
 - [ ] Header shows "Loosey Goosey" on the left and a gear icon on the right.
 
+## Format picker (above the drop zone)
+
+- [ ] A segmented control labeled "Convert to" appears between the header and the drop zone with three options: **JPEG / PNG / GIF**, JPEG selected by default.
+- [ ] Switch to PNG → segment slides. Open the gear popover → the Quality slider is hidden (PNG is lossless).
+- [ ] Switch back to JPEG in the popover-aware way → Quality slider reappears.
+- [ ] Close the panel, reopen → the most recent choice is restored (persisted via `@AppStorage`).
+
 ## Drop zone (empty queue state)
 
-- [ ] Big dashed-border drop zone in the middle says "Drag & Drop HEIC files / or click to browse".
+- [ ] Big dashed-border drop zone in the middle says "Drag & Drop images / or click to browse".
 - [ ] Footer shows version (e.g., `v1.0.0`) on left and "Open Folder · Clear" on right.
 - [ ] "Clear" is dimmed (queue is empty).
 - [ ] Drag a HEIC file from Finder over the drop zone → background tints blue, dashed border becomes solid blue.
@@ -23,11 +30,15 @@ Open `app/HEICConverter.xcodeproj` in Xcode (regenerate with `cd app && xcodegen
 
 ## Conversion flow
 
-- [ ] The new row shows: thumbnail placeholder (or photo icon), filename, status text ("Converting…" → progress bar → "Converted to JPG"), and a percentage that animates 0 → ~95% then snaps to 100%.
+- [ ] With JPEG selected, drop a HEIC → row shows: thumbnail, filename, "Converting…" → progress bar → "Converted to JPG", percentage animates to ~95% then 100%.
 - [ ] When complete, the trailing slot becomes a blue "Show" pill.
-- [ ] Click "Show" → Finder opens with the resulting JPG selected.
-- [ ] Verify the JPG actually exists in `~/Downloads` (the default output folder).
-- [ ] EXIF/GPS/orientation preserved (open both originals & converted in Preview → ⌘I → compare).
+- [ ] Click "Show" → Finder opens with the resulting file selected.
+- [ ] Verify the file actually exists in `~/Downloads` (the default output folder).
+- [ ] EXIF/GPS/orientation preserved (open both originals & converted in Preview → ⌘I → compare). _For JPEG and PNG outputs only — GIF strips metadata._
+- [ ] Switch to PNG, drop a HEIC → row reads "Converted to PNG"; opens as a PNG in Preview.
+- [ ] Switch to GIF, drop a HEIC → row reads "Converted to GIF"; opens as a single-frame palette GIF in Preview.
+- [ ] With PNG selected, drop a `.png` file → row reads "Already exists" (same-format skip).
+- [ ] Toggle "Overwrite existing files" in Settings, drop the same `.png` again → row converts (re-encode).
 
 ## Bulk conversion
 
@@ -37,21 +48,22 @@ Open `app/HEICConverter.xcodeproj` in Xcode (regenerate with `cd app && xcodegen
 
 ## Mixed / invalid drops
 
-- [ ] Drop 10 files mixing HEIC + JPG + PDF → only HEICs enqueue; the others are silently ignored.
-- [ ] Drop a folder with zero HEICs (e.g., a Music folder) → drop zone shakes briefly (±6pt over 200ms); queue unchanged.
+- [ ] Drop 10 files mixing HEIC + JPG + PNG + PDF → the three image types enqueue; the PDF is silently ignored.
+- [ ] Drop a folder with zero supported images (e.g., a Music folder) → drop zone shakes briefly (±6pt over 200ms); queue unchanged.
 
 ## Click-to-browse
 
 - [ ] Click anywhere on the drop zone → standard macOS `NSOpenPanel` appears.
-- [ ] Select one or more HEICs → files enqueue and convert.
+- [ ] The panel shows any image file as selectable (HEIC, JPG, PNG, GIF, etc.).
+- [ ] Select one or more images → files enqueue and convert.
 
 ## Settings popover (gear icon)
 
 - [ ] Click the gear → settings popover appears above the gear, glass-styled.
 - [ ] Output Folder row shows current folder; clicking "Change" opens a directory picker; selecting a new folder updates the row.
-- [ ] JPEG Quality slider snaps in steps of 5 from 60 to 100; value label updates.
-- [ ] Archive originals toggle works.
-- [ ] Overwrite existing JPEGs toggle works.
+- [ ] With JPEG selected: Quality slider snaps in steps of 5 from 60 to 100; value label updates. With PNG or GIF selected: the slider row is hidden.
+- [ ] Archive originals toggle works (label now reads "Archive originals to image_originals/").
+- [ ] Overwrite existing files toggle works.
 - [ ] Close the panel, reopen → settings persisted (verify by reopening the gear popover).
 
 ## Footer interactions

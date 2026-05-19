@@ -2,16 +2,16 @@ import AppKit
 import UniformTypeIdentifiers
 
 enum Picker {
-    /// Show an NSOpenPanel that accepts any combination of HEIC files and folders.
+    /// Show an NSOpenPanel that accepts any combination of image files and folders.
     /// Returns nil if the user cancels.
     static func chooseFilesOrFolders() -> [URL]? {
         runPanel { panel in
-            panel.title = "Choose HEIC files or folders"
+            panel.title = "Choose images or folders"
             panel.prompt = "Convert"
             panel.canChooseFiles = true
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = true
-            panel.allowedContentTypes = [UTType.heic, UTType.folder]
+            panel.allowedContentTypes = [UTType.image, UTType.folder]
             panel.treatsFilePackagesAsDirectories = false
         }
     }
